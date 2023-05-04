@@ -1,8 +1,8 @@
 ﻿// ConsoleApplication1.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 //
+#include<Windows.h>
 
 #include <iostream>
-#include<Windows.h>
 
 //#define DEVICE_NAME L"\\Device\\HbgDev"
 #define SYMBOLICLINK_NAME L"\\\\.\\ooo_ooo"
@@ -12,6 +12,7 @@ int main()
     auto hDevice = CreateFile(SYMBOLICLINK_NAME, GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE,
         0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
         0);
+
     if (hDevice == INVALID_HANDLE_VALUE)
     {
         printf("error_code :%x\n", GetLastError());

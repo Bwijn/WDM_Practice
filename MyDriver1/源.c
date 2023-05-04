@@ -1,36 +1,7 @@
-#include <wdm.h>
+﻿//#include<Windows.h>
+#include<wdm.h>
 
-// ����������ں���
- NTSTATUS
-DriverEntry(
-    _In_ PDRIVER_OBJECT   DriverObject,
-    _In_ PUNICODE_STRING  RegistryPath
-)
-{
-    UNREFERENCED_PARAMETER(RegistryPath);
-
-    KdPrint(("DriverEntry called\n"));
-
-    // ������������Ĵ�������
-    DriverObject->DriverUnload = UnloadDriver;
-
-    // ��ʼ���豸����
-    NTSTATUS status = InitDeviceObject(DriverObject);
-    if (!NT_SUCCESS(status))
-    {
-        KdPrint(("Failed to initialize device object (Status: 0x%X)\n", status));
-        return status;
-    }
-
-    // ע��ص�����
-    RegisterCallbacks();
-
-    KdPrint(("Driver initialized successfully\n"));
-
-    return STATUS_SUCCESS;
-}
-
-// ��������ж�غ���
+// 0‡50‹50…90…40…60ˆ00ˆ4¨°0ˆ40…90ˆ80‰10†20…40‡80‹5
  VOID UnloadDriver(
     _In_ PDRIVER_OBJECT DriverObject
 )
@@ -39,13 +10,12 @@ DriverEntry(
 
     KdPrint(("DriverUnload called\n"));
 
-    // ȡ��ע��ص�����
-    UnregisterCallbacks();
+    //UnregisterCallbacks();
 
     KdPrint(("Driver unloaded successfully\n"));
 }
 
-// ��ʼ���豸����
+// 0…60‹10‡80†40†30…40‡7¨¨¡À0†00…90ˆ80ˆ3¨®
 NTSTATUS InitDeviceObject(
     _In_ PDRIVER_OBJECT DriverObject
 )
@@ -54,10 +24,10 @@ NTSTATUS InitDeviceObject(
     UNICODE_STRING deviceName;
     PDEVICE_OBJECT deviceObject;
 
-    // ��ʼ���豸����
+    // 0…60‹10‡80†40†30…40‡7¨¨¡À0†00‡10‹40…60‡4
     RtlInitUnicodeString(&deviceName, L"\\Device\\MyDriver");
 
-    // �����豸����
+    // 0…70…70†5¡§0‡7¨¨¡À0†00…90ˆ80ˆ3¨®
     status = IoCreateDevice(
         DriverObject,
         0,
@@ -73,7 +43,7 @@ NTSTATUS InitDeviceObject(
         return status;
     }
 
-    // �����豸����Ĵ�������
+    // 0‡7¨¨0‰00‡10‡7¨¨¡À0†00…90ˆ80ˆ3¨®0…80‡20…70„70†8¨ª0†20…40‡80‹5
     deviceObject->Flags |= DO_DIRECT_IO;
     deviceObject->Flags &= ~DO_DEVICE_INITIALIZING;
     //deviceObject->DriverUnload = UnloadDriver;
@@ -83,15 +53,40 @@ NTSTATUS InitDeviceObject(
     return STATUS_SUCCESS;
 }
 
-// ע��ص�����
+// ¡Á0„40…5¨¢0†30‰10…8¡Â0†20…40‡80‹5
 VOID RegisterCallbacks()
 {
-    // �ڴ˴�ע����Ҫ�Ļص�����
-    // ���磺IoRegisterShutdownNotification, PsSetLoadImageNotifyRoutine, ExRegisterCallback ��
+    // 0ˆ80‰30…70‡90…70„7¡Á0„40…5¨¢0ˆ4¨¨0ˆ60„90…80‡20†30‰10…8¡Â0†20…40‡80‹5
+    // 0†80‹50‡60Š40„50†2IoRegisterShutdownNotification, PsSetLoadImageNotifyRoutine, ExRegisterCallback 0…80‡6
 }
 
-// ȡ��ע��ص�����
-VOID UnregisterCallbacks()
+
+
+NTSTATUS
+DriverEntry(
+    _In_ PDRIVER_OBJECT   DriverObject,
+    _In_ PUNICODE_STRING  RegistryPath
+)
 {
-    // �ڴ˴�ȡ��ע��֮ǰע��Ļص�����
+    UNREFERENCED_PARAMETER(RegistryPath);
+
+    KdPrint(("DriverEntry called\n"));
+
+    // 0‡7¨¨0‰00‡10‡50‹50…90…40…60ˆ00ˆ4¨°0…80‡20…70„70†8¨ª0†20…40‡80‹5
+    DriverObject->DriverUnload = UnloadDriver;
+
+    // 0…60‹10‡80†40†30…40‡7¨¨¡À0†00…90ˆ80ˆ3¨®
+    NTSTATUS status = InitDeviceObject(DriverObject);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("Failed to initialize device object (Status: 0x%X)\n", status));
+        return status;
+    }
+
+    // ¡Á0„40…5¨¢0†30‰10…8¡Â0†20…40‡80‹5
+    RegisterCallbacks();
+
+    KdPrint(("Driver initialized successfully\n"));
+
+    return STATUS_SUCCESS;
 }
