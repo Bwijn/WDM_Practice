@@ -1,8 +1,14 @@
-﻿#include<wdm.h>
+﻿#include<ntddk.h>
 
+#include<wdm.h>
+//#include<winnt.h> // 博客原文是直接定义 process_xxxxx 并没有 添加这个头文件,这个头文件各种error
 PVOID pRegistrationHandle;
 # define PROTECT_NAME "myEx86_64.exe"
 #ifdef _WIN64
+#define PROCESS_TERMINATE         0x0001  
+#define PROCESS_VM_OPERATION      0x0008  
+#define PROCESS_VM_READ           0x0010  
+#define PROCESS_VM_WRITE          0x0020
 typedef struct _LDR_DATA
 {
 	LIST_ENTRY listEntry;
@@ -34,6 +40,14 @@ typedef struct _LDR_DATA
 }LDR_DATA, * PLDR_DATA;
 #endif
 
+//函数声明   才能用
+
+NTKERNELAPI
+UCHAR*
+PsGetProcessImageFileName(
+	__in PEPROCESS Process
+);
+
 VOID UnloadDriver(
 	_In_ PDRIVER_OBJECT DriverObject
 )
@@ -48,46 +62,6 @@ VOID UnloadDriver(
 }
 
 
-NTSTATUS InitDeviceObject(
-	_In_ PDRIVER_OBJECT DriverObject
-)
-{
-	NTSTATUS status;
-	UNICODE_STRING deviceName;
-	PDEVICE_OBJECT deviceObject;
-
-
-	RtlInitUnicodeString(&deviceName, L"\\Device\\MyDriver");
-
-
-	status = IoCreateDevice(
-		DriverObject,
-		0,
-		&deviceName,
-		FILE_DEVICE_UNKNOWN,
-		0,
-		FALSE,
-		&deviceObject
-	);
-
-	if (!NT_SUCCESS(status))
-	{
-		return status;
-	}
-
-	deviceObject->Flags |= DO_DIRECT_IO;
-	deviceObject->Flags &= ~DO_DEVICE_INITIALIZING;
-	//deviceObject->DriverUnload = UnloadDriver;
-
-	KdPrint(("Device object created successfully\n"));
-
-	return STATUS_SUCCESS;
-}
-
-VOID RegisterCallbacks()
-{
-
-}
 
 // 操作这个进程之前的操作。
 OB_PREOP_CALLBACK_STATUS  PobPreOperationCallback(
@@ -100,12 +74,13 @@ OB_PREOP_CALLBACK_STATUS  PobPreOperationCallback(
 	{
 		return OB_PREOP_SUCCESS;
 	}
+	PLDR_DATA pld;//指向_LDR_DATA_TABLE_ENTRY结构体的指针
 
 	UNREFERENCED_PARAMETER(RegistrationContext);
 	HANDLE pid = PsGetProcessId((PEPROCESS)pOperationInformation->Object);
 	char szProcName[16] = { 0 };
-	UNREFERENCED_PARAMETER(RegistrationContext);
-	strcpy(szProcName, GetProcessImageNameByProcessID((ULONG)pid));
+	PsGetProcessImageFileName((PEPROCESS)pOperationInformation->Object);
+	strcpy(szProcName, PsGetProcessImageFileName((PEPROCESS)pOperationInformation->Object));
 
 	if (!_stricmp(szProcName, PROTECT_NAME))//等于0 也就是字符串相等时
 	{
@@ -208,33 +183,20 @@ DriverEntry(
 )
 {
 
+	PLDR_DATA pld;
+	// 绕过MmVerifyCallbackFunction。
+	pld = (PLDR_DATA)DriverObject->DriverSection;
+	pld->Flags |= 0x20;
 
-	//初始化这个结构体
+	// 注册函数实施降权
+	NTSTATUS v = InitObRegistration();
 
-	OB_OPERATION_REGISTRATION obOperationRegistrations;
-	obOperationRegistrations.ObjectType = PsProcessType;
-	obOperationRegistrations.Operations |= OB_OPERATION_HANDLE_CREATE;
-	obOperationRegistrations.Operations |= OB_OPERATION_HANDLE_DUPLICATE;
-	obOperationRegistrations.PreOperation = PreOperationCallback;
-	obOperationRegistrations.PostOperation = NULL;
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
 	KdPrint(("DriverEntry called\n"));
 
 	DriverObject->DriverUnload = UnloadDriver;
-
-	NTSTATUS status = InitDeviceObject(DriverObject);
-	if (!NT_SUCCESS(status))
-	{
-		KdPrint(("Failed to initialize device object (Status: 0x%X)\n", status));
-		KdPrint(("Failed to initialize device object (Status: 0x%X)\n", status));
-		return status;
-	}
-
-	RegisterCallbacks();
-
-	KdPrint(("Driver initialized successfully\n"));
 
 	return STATUS_SUCCESS;
 }
