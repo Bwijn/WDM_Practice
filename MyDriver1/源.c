@@ -64,6 +64,17 @@ DriverEntry(
     _In_ PUNICODE_STRING  RegistryPath
 )
 {
+
+
+    //初始化这个结构体
+
+    OB_OPERATION_REGISTRATION obOperationRegistrations;
+    obOperationRegistrations.ObjectType = PsProcessType;
+    obOperationRegistrations.Operations |= OB_OPERATION_HANDLE_CREATE;
+    obOperationRegistrations.Operations |= OB_OPERATION_HANDLE_DUPLICATE;
+    obOperationRegistrations.PreOperation = PreOperationCallback;
+    obOperationRegistrations.PostOperation = NULL;
+
     UNREFERENCED_PARAMETER(RegistryPath);
 
     KdPrint(("DriverEntry called\n"));
