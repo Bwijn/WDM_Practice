@@ -1,5 +1,4 @@
-﻿//#include<Windows.h>
-#include<wdm.h>
+﻿#include<wdm.h>
 
 
  VOID UnloadDriver(
