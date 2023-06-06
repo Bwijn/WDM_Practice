@@ -66,83 +66,41 @@ VOID UnloadDriver(
 // 操作这个进程之前的操作。
 OB_PREOP_CALLBACK_STATUS  PobPreOperationCallback(
 	PVOID RegistrationContext,
-	POB_PRE_OPERATION_INFORMATION pOperationInformation
+	POB_PRE_OPERATION_INFORMATION OperationInformation
 ) {
 
-	// 判断对象类型 
-	if (*PsProcessType != pOperationInformation->ObjectType)
+	// 判断对象类型 这一步如果不匹配直接 不看了，直接返回 SUCCESS;
+	if (*PsProcessType != OperationInformation->ObjectType)
 	{
 		return OB_PREOP_SUCCESS;
 	}
-	PLDR_DATA pld;//指向_LDR_DATA_TABLE_ENTRY结构体的指针
+	//PLDR_DATA pld;//指向_LDR_DATA_TABLE_ENTRY结构体的指针
 
 	UNREFERENCED_PARAMETER(RegistrationContext);
-	HANDLE pid = PsGetProcessId((PEPROCESS)pOperationInformation->Object);
-	char szProcName[16] = { 0 };
-	PsGetProcessImageFileName((PEPROCESS)pOperationInformation->Object);
-	strcpy(szProcName, PsGetProcessImageFileName((PEPROCESS)pOperationInformation->Object));
+	UNREFERENCED_PARAMETER(OperationInformation);
 
-	if (!_stricmp(szProcName, PROTECT_NAME))//等于0 也就是字符串相等时
+	char certainProcess[16] = { 0 };
+	strcpy(certainProcess, PsGetProcessImageFileName((PEPROCESS)OperationInformation->Object));
+
+	if (_stricmp(certainProcess, PROTECT_NAME))return OB_PREOP_SUCCESS;
+
+	switch (OperationInformation->Operation)
 	{
+	case OB_OPERATION_HANDLE_DUPLICATE:
+		break;
 
-		if ((pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & PROCESS_TERMINATE) == PROCESS_TERMINATE)
+	case OB_OPERATION_HANDLE_CREATE:
+	{
+		if (OperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & 1)
 		{
-			//Terminate the process, such as by calling the user-mode TerminateProcess routine..
-			pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_TERMINATE;
+			OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
 		}
-		if ((pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & PROCESS_VM_OPERATION) == PROCESS_VM_OPERATION)
-		{
-			//Modify the address space of the process, such as by calling the user-mode WriteProcessMemory and VirtualProtectEx routines.
-			pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_VM_OPERATION;
-		}
-		if ((pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & PROCESS_VM_READ) == PROCESS_VM_READ)
-		{
-			//Read to the address space of the process, such as by calling the user-mode ReadProcessMemory routine.
-			pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_VM_READ;
-		}
-		if ((pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & PROCESS_VM_WRITE) == PROCESS_VM_WRITE)
-		{
-			//Write to the address space of the process, such as by calling the user-mode WriteProcessMemory routine.
-			pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_VM_WRITE;
-		}
+		break;
+	}
 	}
 
-
-	//获取该进程结构对象的名称
-	//pEProcess = (PEPROCESS)pOperationInformation->Object;
-	//PUCHAR pProcessName = PsGetProcessImageFileName(pEProcess);
-
-	// 判断是否为保护进程，不是则放行
-	//if (NULL != pProcessName)
-	//{
-	//	if (0 != _stricmp(pProcessName, PROTECT_NAME))
-	//	{
-	//		return OB_PREOP_SUCCESS;
-	//	}
-	//}
-
-	// 判断操作类型,如果该句柄是终止操作，则拒绝该操作
-	//switch (pOperationInformation->Operation)
-	//{
-	//case OB_OPERATION_HANDLE_DUPLICATE:
-	//	break;
-	//	PROCESS_TERMINATE
-	//case OB_OPERATION_HANDLE_CREATE:
-	//	{
-	//		//如果要结束进程,进程管理器结束进程发送0x1001，taskkill指令结束进程发送0x0001，taskkil加/f参数结束进程发送0x1401
-	//		int code = pOperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess;
-	//		if ((code == PROCESS_TERMINATE_0) || (code == PROCESS_TERMINATE_1) || (code == PROCESS_KILL_F))
-	//		{
-	//			//给进程赋予新权限
-	//			pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
-	//			DbgPrint("拒绝执行当前操作");
-	//		}
-	//		if (code == PROCESS_TERMINATE_2)
-	//			pOperationInformation->Parameters->CreateHandleInformation.DesiredAccess = STANDARD_RIGHTS_ALL;
-	//		break;
-	//	}
-	//}
 	return OB_PREOP_SUCCESS;
+
 
 }
 
@@ -161,16 +119,16 @@ NTSTATUS InitObRegistration()
 
 	//线程类型
 	oor.ObjectType = PsProcessType;
-	oor.Operations = OB_OPERATION_HANDLE_CREATE | OB_OPERATION_HANDLE_DUPLICATE;
+	oor.Operations = OB_OPERATION_HANDLE_CREATE ;
 	oor.PreOperation = PobPreOperationCallback;
 
 
 
 	ocr.Version = OB_FLT_REGISTRATION_VERSION;
-	ocr.OperationRegistrationCount = 0;
+	ocr.OperationRegistrationCount = 1;
 	ocr.RegistrationContext = NULL;
 	ocr.OperationRegistration = &oor;
-	RtlInitUnicodeString(&ocr.Altitude, L"321000"); // 设置加载顺序
+	RtlInitUnicodeString(&ocr.Altitude, L"321000"); // 设置加载顺序 Altitude n. 海拔的意思，在这里是代表驱动加载顺序，就按照MSDN来操作就行。
 
 
 
@@ -183,18 +141,22 @@ DriverEntry(
 )
 {
 
-	PLDR_DATA pld;
-	// 绕过MmVerifyCallbackFunction。
-	pld = (PLDR_DATA)DriverObject->DriverSection;
-	pld->Flags |= 0x20;
+	// 暂时没发现有什么用？ 暂时没有用到这个 结构体，只是在局部空间里。
+	//PLDR_DATA pld;
+	//// 绕过MmVerifyCallbackFunction。
+	//pld = (PLDR_DATA)DriverObject->DriverSection;
+	//pld->Flags |= 0x20;
 
 	// 注册函数实施降权
 	NTSTATUS v = InitObRegistration();
 
+	//通过句柄获取EProcess
+	if (!NT_SUCCESS(v))
+		return FALSE;
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
-	KdPrint(("DriverEntry called\n"));
+	KdPrint(("InitObRegistration DriverEntry called\n"));
 
 	DriverObject->DriverUnload = UnloadDriver;
 
