@@ -54,11 +54,13 @@ VOID UnloadDriver(
 {
 	UNREFERENCED_PARAMETER(DriverObject);
 
-	KdPrint(("DriverUnload called\n"));
+	// unregister callbacks
+	if (pRegistrationHandle != NULL) {
+		ObUnRegisterCallbacks(pRegistrationHandle);
+		pRegistrationHandle = NULL;
+	}
 
-	//UnregisterCallbacks();
-
-	KdPrint(("Driver unloaded successfully\n"));
+	KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "ProcessProtect: unload driver\n"));
 }
 
 
@@ -87,14 +89,22 @@ OB_PREOP_CALLBACK_STATUS  PobPreOperationCallback(
 	switch (OperationInformation->Operation)
 	{
 	case OB_OPERATION_HANDLE_DUPLICATE:
+		OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
 		break;
 
 	case OB_OPERATION_HANDLE_CREATE:
 	{
-		if (OperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & 1)
+		// filter operation "OB_OPERATION_HANDLE_CREATE", and remove "PROCESS_TERMINAL"
+		//if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "ProcessProtect: callback remove [%s] PROCESS_TERMINAL\n", certainProcess));
+		OperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_TERMINATE;
+
+		OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
+		//}
+
+	/*	if (OperationInformation->Parameters->CreateHandleInformation.OriginalDesiredAccess & 1)
 		{
-			OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
-		}
+		}*/
 		break;
 	}
 	}
@@ -119,7 +129,7 @@ NTSTATUS InitObRegistration()
 
 	//线程类型
 	oor.ObjectType = PsProcessType;
-	oor.Operations = OB_OPERATION_HANDLE_CREATE ;
+	oor.Operations = OB_OPERATION_HANDLE_CREATE;
 	oor.PreOperation = PobPreOperationCallback;
 
 
@@ -140,25 +150,24 @@ DriverEntry(
 	_In_ PUNICODE_STRING  RegistryPath
 )
 {
-
-	// 暂时没发现有什么用？ 暂时没有用到这个 结构体，只是在局部空间里。
-	//PLDR_DATA pld;
-	//// 绕过MmVerifyCallbackFunction。
-	//pld = (PLDR_DATA)DriverObject->DriverSection;
-	//pld->Flags |= 0x20;
-
-	// 注册函数实施降权
-	NTSTATUS v = InitObRegistration();
-
-	//通过句柄获取EProcess
-	if (!NT_SUCCESS(v))
-		return FALSE;
-
 	UNREFERENCED_PARAMETER(RegistryPath);
 
-	KdPrint(("InitObRegistration DriverEntry called\n"));
-
 	DriverObject->DriverUnload = UnloadDriver;
+
+	//// 绕过MmVerifyCallbackFunction。
+	PLDR_DATA pld;
+	pld = (PLDR_DATA)DriverObject->DriverSection;
+	pld->Flags |= 0x20;
+
+	// 注册函数实施降权
+	NTSTATUS Status = InitObRegistration();
+
+	//通过句柄获取EProcess
+	if (!NT_SUCCESS(Status)) {
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "ProcessProtect: ObRegisterCallbcks failed status 0x%x\n", Status));
+		return Status;
+	}
+
 
 	return STATUS_SUCCESS;
 }
