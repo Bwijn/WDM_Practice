@@ -3,7 +3,11 @@
 #include<wdm.h>
 //#include<winnt.h> // 博客原文是直接定义 process_xxxxx 并没有 添加这个头文件,这个头文件各种error
 PVOID pRegistrationHandle;
-# define PROTECT_NAME "myEx86_64.exe"
+// 要检测的进程名称
+#define TARGET_PROCESS_1 "notepad.exe"
+#define TARGET_PROCESS_2 "cheatengine-x86_64-SSE4-AVX2.exe"
+
+
 #ifdef _WIN64
 #define PROCESS_TERMINATE         0x0001  
 #define PROCESS_VM_OPERATION      0x0008  
@@ -81,11 +85,23 @@ OB_PREOP_CALLBACK_STATUS  PobPreOperationCallback(
 	UNREFERENCED_PARAMETER(RegistrationContext);
 	UNREFERENCED_PARAMETER(OperationInformation);
 
-	char certainProcess[16] = { 0 };
+	char certainProcess[40] = { 0 };
 	strcpy(certainProcess, PsGetProcessImageFileName((PEPROCESS)OperationInformation->Object));
 
-	if (_stricmp(certainProcess, PROTECT_NAME))return OB_PREOP_SUCCESS;
+	// 不是被保护程序就直接走 return；OB_PREOP_SUCCESS value = 1 代表不相等 代表不是目标进程 直接放 此函数就结束了
+	// 检查进程名称是否匹配
+	if (strcmp(TARGET_PROCESS_1, certainProcess) != 0 &&
+		strcmp(TARGET_PROCESS_2, certainProcess) != 0)
+	{
+		return;
+	}
+	if (strcmp(TARGET_PROCESS_1, certainProcess) == 0 )
+	{
+		DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "notepad.exe processing\n");
+	}
+	//if (_stricmp(certainProcess, PROTECT_NAME))return OB_PREOP_SUCCESS;
 
+	// 这里是else 也就是检测到保护进程的操作
 	switch (OperationInformation->Operation)
 	{
 	case OB_OPERATION_HANDLE_DUPLICATE:
@@ -96,7 +112,7 @@ OB_PREOP_CALLBACK_STATUS  PobPreOperationCallback(
 	{
 		// filter operation "OB_OPERATION_HANDLE_CREATE", and remove "PROCESS_TERMINAL"
 		//if (OperationInformation->Operation == OB_OPERATION_HANDLE_CREATE) {
-		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "ProcessProtect: callback remove [%s] PROCESS_TERMINAL\n", certainProcess));
+		KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "TargetProcess protected: %s", certainProcess));
 		OperationInformation->Parameters->CreateHandleInformation.DesiredAccess &= ~PROCESS_TERMINATE;
 
 		OperationInformation->Parameters->CreateHandleInformation.DesiredAccess = 0;
