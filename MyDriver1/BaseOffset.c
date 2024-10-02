@@ -1,0 +1,22 @@
+#pragma once
+#include"wdm.h"
+UCHAR pattern[] = {
+	0x48, 0x89, 0x5C, 0x24, 0x08,  // 5 bytes
+	0x57,                          // 1 byte
+	0x48, 0x83, 0xEC, 0x20,        // 4 bytes
+	0x65, 0x48, 0x8B, 0x3C, 0x25, 0x88, 0x01, 0x00, 0x00,  // 9 bytes
+	0x66, 0xFF, 0x8F, 0xE4, 0x01, 0x00, 0x00   // 7 bytes
+};
+
+CHAR mask[] = "xxxxxxxxxxxxxxxxxxxxxxxxxx";  // 26 'x'
+
+
+UCHAR* PAGE_base = 0;
+DWORD64 ntosBase=0;
+
+
+char ntImageName[] = "ntoskrnl.exe";
+WCHAR ntImageName_W[] = L"ntoskrnl.exe";
+
+UNICODE_STRING ntImageName_U;
+
